@@ -9,6 +9,7 @@ import lombok.*;
 import javax.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static javax.persistence.GenerationType.IDENTITY;
@@ -40,14 +41,18 @@ public class Diary extends BaseTimeEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
+    @Setter
     @OneToMany(mappedBy = "diary", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DiaryHashtag> diaryHashtags;
 
+    @Setter
     @OneToMany(mappedBy = "diary", orphanRemoval = true)
     private List<DiaryImage> diaryImages;
 
-    @OneToOne(mappedBy = "diary", orphanRemoval = true)
-    private DiaryPlace diaryPlace;
+    @Setter
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "place_id", nullable = false)
+    private Place place;
 
     public void update(String content, OpenYn openYn, Double star) {
         this.content = content;
@@ -55,9 +60,12 @@ public class Diary extends BaseTimeEntity {
         this.star = star;
     }
 
+    public void addHashTag(Hashtag tag) {
+        this.diaryHashtags.add(new DiaryHashtag(this, tag));
+    }
 
-
-
-
+    public void addImage(DiaryImage diaryImage) {
+        this.diaryImages.add(diaryImage);
+    }
 
 }

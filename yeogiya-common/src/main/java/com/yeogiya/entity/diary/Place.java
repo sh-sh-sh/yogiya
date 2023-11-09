@@ -29,8 +29,8 @@ public class Place {
     @Column(name = "kakao_id")
     private String kakaoId;
 
-    @OneToMany(mappedBy = "place", orphanRemoval = true, targetEntity = DiaryPlace.class)
-    private List<DiaryPlace> diaryPlaces = new ArrayList<>();
+    @OneToMany(mappedBy = "place", orphanRemoval = true, targetEntity = Diary.class)
+    private List<Diary> diarys = new ArrayList<>();
 
 
 }

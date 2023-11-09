@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -31,14 +30,11 @@ import java.util.List;
 public class DiaryService {
 
     private final DiaryRepository diaryRepository;
-    private final HashtagRepository hashtagRepository;
-    private final DiaryHashtagRepository diaryHashtagRepository;
     private final MemberRepository memberRepository;
-    private final DiaryPlaceRepository diaryPlaceRepository;
-    private final PlaceRepository placeRepository;
-    private final DiaryImageRepository diaryImageRepository;
 
     private final DiaryImageService diaryImageService;
+    private final DiaryHashtagService hashtagService;
+    private final DiaryPlaceService placeService;
 
     @Transactional
     public DiaryIdResponseDTO postDiary(DiarySaveRequestDTO diarySaveRequestDTO,
@@ -49,51 +45,11 @@ public class DiaryService {
         Member member = memberRepository.findById(principal.getUsername()).orElseThrow(() -> new ClientException.NotFound(EnumErrorCode.NOT_FOUND_MEMBER));
         Diary diary = diarySaveRequestDTO.toEntity(member);
 
-        List<DiaryHashtag> diaryHashtags = new ArrayList<>();
-        List<String> tagStrings = diarySaveRequestDTO.getHashtags();
-
-        if(tagStrings.size() != 0) {
-            tagStrings.stream()
-                    .map(hashtag ->
-                            hashtagRepository.findByName(hashtag)
-                                    .orElseGet(() -> hashtagRepository.save(
-                                            Hashtag.builder()
-                                                    .name(hashtag)
-                                                    .build())))
-                    .forEach(hashtag -> {
-                            DiaryHashtag diaryHashtag = new DiaryHashtag(diary, hashtag);
-                            diaryHashtags.add(diaryHashtag);
-                            diaryHashtagRepository.save(diaryHashtag);
-                    });
-        }
-
-        // 이미지 저장 로직
-        List<DiaryImage> diaryImages = new ArrayList<>();
-        if (multipartFiles != null){
-            for (MultipartFile m : multipartFiles) {
-                DiaryImage imageFileUpload = diaryImageService.upload(m, diary);
-                diaryImages.add(imageFileUpload);
-            }
-        }
-
-        // 장소 저장 로직
-        String kakaoId = placeRequestDTO.getKakaoId();
-        placeRepository.findByKakaoId(kakaoId).orElseGet(() -> placeRepository.save(
-                Place.builder()
-                .name(placeRequestDTO.getName())
-                .address(placeRequestDTO.getAddress())
-                .kakaoId(placeRequestDTO.getKakaoId())
-                .build()));
-
-        Place place = placeRepository.findByKakaoId(kakaoId)
-                .orElseThrow(() -> new ClientException.NotFound(EnumErrorCode.NOT_FOUND_PLACE));
-        DiaryPlace diaryPlace = new DiaryPlace(diary, place);
-        diaryPlaceRepository.save(diaryPlace);
-
-
+        hashtagService.setTags(diary, diarySaveRequestDTO.getHashtags());
+        diaryImageService.setDiaryImage(diary, multipartFiles);
+        placeService.setPlace(diary, placeRequestDTO);
 
         diaryRepository.save(diary);
-
 
         return DiaryIdResponseDTO.builder()
                 .id(diary.getId())
@@ -111,43 +67,9 @@ public class DiaryService {
         );
 
         validateAccess(principal, diary);
-        // 태그
-        diaryHashtagRepository.deleteByDiaryId(diaryId);
-        List<String> tagStrings = diaryModifyRequestDTO.getHashtags();
-        if (tagStrings.size() != 0) {
-            tagStrings.stream()
-                    .map(hashtag ->
-                            hashtagRepository.findByName(hashtag)
-                                    .orElseGet(() -> hashtagRepository.save(
-                                            Hashtag.builder()
-                                                    .name(hashtag)
-                                                    .build())))
-                    .forEach(hashtag -> {
-                        DiaryHashtag diaryHashtag = new DiaryHashtag(diary, hashtag);
-                        diaryHashtagRepository.save(diaryHashtag);
-                    });
-        }
-
-
-        // 이미지
-        diaryImageRepository.deleteByDiaryId(diaryId);
-        for (MultipartFile m : multipartFiles) {
-            DiaryImage imageFileUpload = diaryImageService.upload(m, diary);
-        }
-
-        // 장소
-        String kakaoId = placeRequestDTO.getKakaoId();
-        placeRepository.findByKakaoId(kakaoId).orElseGet(() -> placeRepository.save(
-                Place.builder()
-                        .name(placeRequestDTO.getName())
-                        .address(placeRequestDTO.getAddress())
-                        .kakaoId(placeRequestDTO.getKakaoId())
-                        .build()));
-
-        Place place = placeRepository.findByKakaoId(kakaoId).orElseThrow(() -> new ClientException.NotFound(EnumErrorCode.NOT_FOUND_PLACE));
-        DiaryPlace diaryPlace = diaryPlaceRepository.findByDiaryId(diaryId).orElseThrow(() -> new ClientException.NotFound(EnumErrorCode.NOT_FOUND_PLACE));
-        diaryPlace.update(place);
-
+        hashtagService.setTags(diary, diaryModifyRequestDTO.getHashtags());
+        diaryImageService.setDiaryImage(diary, multipartFiles);
+        placeService.setPlace(diary, placeRequestDTO);
 
         diary.update(diaryModifyRequestDTO.getContent(), diaryModifyRequestDTO.getOpenYn(), diaryModifyRequestDTO.getStar());
 
@@ -174,9 +96,7 @@ public class DiaryService {
 
     public DiaryResponseDTO getDiary(Long diaryId) {
         Diary diary = diaryRepository.findById(diaryId).orElseThrow(() ->  new ClientException.NotFound(EnumErrorCode.NOT_FOUND_DIARY));
-        DiaryResponseDTO diaryResponseDTO = new DiaryResponseDTO(diary);
-
-        return diaryResponseDTO;
+        return new DiaryResponseDTO(diary);
     }
 
     @Transactional
