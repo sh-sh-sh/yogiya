@@ -44,7 +44,7 @@ public class DiaryResponseDTO {
                 .map(DiaryImage::getPath)
                 .collect(Collectors.toList());
 
-        this.placeName = diary.getDiaryPlace().getPlace().getName();
+        this.placeName = diary.getPlace().getName();
 
 
     }
